@@ -1,0 +1,16 @@
+version: '2.2'
+services:
+  postgres-db:
+    image: postgres:latest
+    container_name: lottery-db
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: lotteryservice
+      POSTGRES_USER: lotteryservice
+      POSTGRES_PASSWORD: lotteryservice
+    healthcheck:
+      test: [ 'CMD', 'pg_isready', "-q", "-d", "lotteryservice", "-U", "lotteryservice" ]
+      interval: 5s
+      retries: 5
+      timeout: 5s

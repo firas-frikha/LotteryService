@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package lottery.service;
+
+option java_package = "lottery.service";
+option java_multiple_files = true;
+
+service LotteryService {
+  rpc AdminCreateLottery(AdminCreateLotteryRequest) returns (AdminCreateLotteryResponse);
+  rpc ParticipateInLottery(ParticipateInLotteryRequest) returns (ParticipateInLotteryResponse);
+}
+
+message AdminCreateLotteryRequest {
+  string name = 1;
+}
+
+message AdminCreateLotteryResponse {
+  string id = 1;
+}
+
+message ParticipateInLotteryRequest {
+  string lottery_id = 1;
+}
+
+message ParticipateInLotteryResponse {
+  string ballot_id = 1;
+}
