@@ -5,19 +5,17 @@ import akka.cluster.sharding.typed.scaladsl.EntityTypeKey
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior, ReplyEffect}
 
-import java.time.temporal.ChronoUnit
-import java.time.{Clock, LocalDateTime}
-import java.util.UUID
+import java.time.{Clock, LocalDate}
 import scala.util.Random
 
 object LotteryEntity {
-  type Id = UUID
-  type BallotId = UUID
-  type CreatedAt = LocalDateTime
+  type Id = String
+  type BallotId = String
+  type CreatedAt = LocalDate
 
   //Define the Tag:
   final val Single = "lotteryEntity"
-  final val Tags = IndexedSeq.tabulate(8)(i => s"shard-$i")
+  final val Tags = Vector("tag-1", "tag-2", "tag-3")
 
   // Define the entity Type key:
   val entityTypeKey: EntityTypeKey[Command] = EntityTypeKey[Command](LotteryEntity.getClass.getSimpleName)
@@ -32,7 +30,7 @@ object LotteryEntity {
       emptyState = EmptyState(id = id),
       commandHandler = (state, command) => state.applyCommand(command, clock),
       eventHandler = (state, event) => state.applyEvent(event)
-    ).withTagger(_ => Set(Single))
+    ).withTagger(event => Set(Tags(math.abs(event.id.hashCode % Tags.size))))
 
 
   // Commands that will be handled by the lottery entity
@@ -122,7 +120,7 @@ object LotteryEntity {
             CreatedLotteryEvent(
               id = id,
               lotteryName = createCommand.lotteryName,
-              createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+              createdAt = LocalDate.now(clock)
             )
           ).thenReply(createCommand.replyTo)(newState => SuccessfulCreateResult(newState.id))
         case actualCommand: ParticipateCommand =>

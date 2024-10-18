@@ -66,8 +66,6 @@ class HttpServerSpec
           val port = Random.nextInt(10)
           val route = mock[HttpRequest => Future[HttpResponse]]
 
-          val binding = Http.ServerBinding(new InetSocketAddress(host, port))(() => Future.successful(()), _ => Future.successful(HttpConnectionTerminated))
-
           val exception = new RuntimeException("Unknown exception")
 
           val httpBinderMock = mock[HttpBinder]

@@ -5,9 +5,13 @@ package lottery.service;
 option java_package = "lottery.service";
 option java_multiple_files = true;
 
+import "google/protobuf/empty.proto";
+
 service LotteryService {
   rpc AdminCreateLottery(AdminCreateLotteryRequest) returns (AdminCreateLotteryResponse);
   rpc ParticipateInLottery(ParticipateInLotteryRequest) returns (ParticipateInLotteryResponse);
+  rpc FetchOpenLotteries(google.protobuf.Empty) returns (FetchOpenLotteriesResponse);
+  rpc FetchLotteriesResultsByDate(FetchLotteriesResultsByDateRequest) returns (FetchLotteriesResultsByDateResponse);
 }
 
 message AdminCreateLotteryRequest {
@@ -24,4 +28,35 @@ message ParticipateInLotteryRequest {
 
 message ParticipateInLotteryResponse {
   string ballot_id = 1;
+}
+
+message FetchOpenLotteriesResponse {
+  repeated Lottery lotteries = 1;
+}
+
+message Lottery {
+  string lottery_id = 1;
+  string name = 2;
+  Date created_at = 3;
+}
+
+message LotteryResult {
+  string lottery_id = 1;
+  string lottery_name = 2;
+  Date lottery_creation_date = 3;
+  optional string lottery_winner = 4;
+}
+
+message FetchLotteriesResultsByDateRequest {
+  Date lottery_date = 1;
+}
+
+message FetchLotteriesResultsByDateResponse {
+  repeated LotteryResult lotteries_result = 1;
+}
+
+message Date {
+  int32 year = 1;
+  int32 month = 2;
+  int32 day = 3;
 }

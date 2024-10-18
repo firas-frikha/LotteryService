@@ -8,7 +8,6 @@ import core.LotteryEntity
 import grpcserver.middleware.ClusterShardingManager
 
 import java.time.Clock
-import java.util.UUID
 import scala.util.{Failure, Success}
 
 object ClusterShardingManagement {
@@ -19,7 +18,7 @@ object ClusterShardingManagement {
       Behaviors.receiveMessage {
         case RegisterEntity(replyTo) =>
           val entity = Entity(typeKey = LotteryEntity.entityTypeKey) { entityContext =>
-            LotteryEntity(id = UUID.fromString(entityContext.entityId),
+            LotteryEntity(id = entityContext.entityId,
               persistenceId = PersistenceId(entityContext.entityTypeKey.name, entityContext.entityId),
               clock = clock
             )

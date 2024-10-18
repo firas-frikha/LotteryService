@@ -7,8 +7,7 @@ import com.typesafe.config.ConfigFactory
 import core.LotteryEntity._
 import org.scalatest.wordspec.AnyWordSpecLike
 
-import java.time.temporal.ChronoUnit
-import java.time.{Clock, LocalDateTime, ZoneOffset, ZonedDateTime}
+import java.time.{Clock, LocalDate, ZoneOffset, ZonedDateTime}
 import java.util.UUID
 import scala.util.Random
 
@@ -24,7 +23,7 @@ class LotteryEntitySpec
 
   "LotteryEntity actor" when {
 
-    val entityId = UUID.randomUUID()
+    val entityId = UUID.randomUUID().toString
     val lotteryName = Random.alphanumeric.take(12).mkString
     val clock = Clock.fixed(ZonedDateTime.now(ZoneOffset.UTC).minusSeconds(10).toInstant, ZoneOffset.UTC)
 
@@ -35,7 +34,7 @@ class LotteryEntitySpec
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -59,11 +58,11 @@ class LotteryEntitySpec
 
       "receiving Participate command" must {
         "reply with UnsupportedParticipateResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val failedResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
@@ -120,7 +119,7 @@ class LotteryEntitySpec
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -157,12 +156,12 @@ class LotteryEntitySpec
 
       "receiving Participate command" must {
         "reply with SuccessfulParticipateResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val ballotAddedEvent = BallotAddedEvent(
@@ -207,7 +206,7 @@ class LotteryEntitySpec
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -240,12 +239,12 @@ class LotteryEntitySpec
 
       "receiving FetchLotteryWinner command" must {
         "reply with UnsupportedFetchLotteryWinnerResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val ballotAddedEvent = BallotAddedEvent(
@@ -298,12 +297,12 @@ class LotteryEntitySpec
     "is in ClosedState" when {
       "receiving CreateCommand" must {
         "reply with UnsupportedCreateResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -368,12 +367,12 @@ class LotteryEntitySpec
 
       "receiving Participate command" must {
         "reply with UnsupportedParticipateResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -436,12 +435,12 @@ class LotteryEntitySpec
 
       "receiving CloseLottery command" must {
         "reply with UnsupportedSuccessfulCloseResult" in {
-          val ballotId = UUID.randomUUID()
+          val ballotId = UUID.randomUUID().toString
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
-            createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+            createdAt = LocalDate.now(clock)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -505,17 +504,17 @@ class LotteryEntitySpec
 
     "receiving FetchLotteryWinner command" must {
       "reply with SuccessfulFetchLotteryWinnerResult" in {
-        val ballotId = UUID.randomUUID()
+        val ballotId = UUID.randomUUID().toString
 
         val createdEvent = CreatedLotteryEvent(
           id = entityId,
           lotteryName = lotteryName,
-          createdAt = LocalDateTime.now(clock).truncatedTo(ChronoUnit.SECONDS)
+          createdAt = LocalDate.now(clock)
         )
 
         val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
           system = system,
-          behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+          behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
         )
 
         val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](

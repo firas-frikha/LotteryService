@@ -35,5 +35,7 @@ libraryDependencies ++= Seq(
 
   "org.postgresql" % "postgresql" % "42.7.3",
 
+  "com.h2database" % "h2" % "2.2.224",
+
 
   "ch.qos.logback" % "logback-classic" % "1.2.13")

@@ -2,14 +2,19 @@ package grpcserver.actor
 
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior}
+import akka.cluster.typed.{ClusterSingleton, SingletonActor}
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import query.service.QueryService
 
+import java.time.Clock
 import scala.concurrent.Future
 
 object LotteryServer {
   def apply(httpServerRef: ActorRef[HttpServer.Input],
             projectionManagement: ActorRef[ProjectionManagement.Input],
-            clusterShardingManagerRef: ActorRef[ClusterShardingManagement.Input]): Behavior[Input] = Behaviors.setup { context =>
+            clusterShardingManagerRef: ActorRef[ClusterShardingManagement.Input],
+            clock: Clock,
+            queryService: QueryService): Behavior[Input] = Behaviors.setup { context =>
 
 
     def handle(host: String,
@@ -36,13 +41,17 @@ object LotteryServer {
           httpServerRef.tell(HttpServer.Bind(host, port, route, httpServerMessageAdapter))
           Behaviors.same
 
-        case WrappedProjectionManagementOutput(ProjectionManagement.FailedProjectionInitialization(message)) =>
+        case WrappedProjectionManagementOutput(ProjectionManagement.FailedProjectionInitialization) =>
           Behaviors.same
 
         case WrappedHttpServerOutput(HttpServer.FailedBinding) =>
           Behaviors.stopped
 
         case WrappedHttpServerOutput(HttpServer.SuccessfulBinding) =>
+          val singletonManager = ClusterSingleton(context.system)
+          singletonManager.init(
+            SingletonActor(LotteryManager(queryService = queryService, clock = clock), "Lottery-Manager")
+          )
           Behaviors.ignore
       }
     }

@@ -21,7 +21,6 @@ class ClusterShardingManagementSpec
 
   val testKit = ActorTestKit()
 
-
   "ClusterShardingManagement" when {
     val clock = Clock.systemUTC()
 

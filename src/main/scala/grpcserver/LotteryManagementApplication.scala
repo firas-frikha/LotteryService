@@ -9,8 +9,9 @@ import com.typesafe.config.ConfigFactory
 import grpcserver.actor.{ClusterShardingManagement, HttpServer, LotteryServer, ProjectionManagement}
 import grpcserver.middleware.{DefaultClusterShardingManager, DefaultHttpBinder}
 import grpcserver.service.{DefaultLotteryServiceApplication, LotteryServiceImpl}
-import infrastructure.SlickJdbcSession
 import lottery.service.{LotteryService, LotteryServiceHandler}
+import query.schema.LotterySchema
+import query.service.DefaultQueryService
 
 import java.io.File
 import java.time.Clock
@@ -33,20 +34,25 @@ final class LotteryManagementApplication(context: ActorContext[_]) {
     val clusterShardingManager = new DefaultClusterShardingManager()
     val httpServerRef = context.spawnAnonymous(HttpServer(httpBinder))
     val clusterShardingManagerRef = context.spawnAnonymous(ClusterShardingManagement(clusterShardingManager, clock))
-    val projectionManagementRef = context.spawnAnonymous(ProjectionManagement(new SlickJdbcSession(slickSession)))
+    val projectionManagementRef = context.spawnAnonymous(ProjectionManagement())
+
+    val defaultQueryService = new DefaultQueryService(
+      new LotterySchema(slickSession),
+      slickSession)
 
     val lotteryServerRef = context.spawnAnonymous(
       LotteryServer(
         httpServerRef,
         projectionManagementRef,
-        clusterShardingManagerRef
+        clusterShardingManagerRef,
+        clock,
+        defaultQueryService
       )
     )
 
     val lotteryServiceApplication = new DefaultLotteryServiceApplication()
 
-
-    val lotteryServiceImpl = new LotteryServiceImpl(lotteryServiceApplication)
+    val lotteryServiceImpl = new LotteryServiceImpl(lotteryServiceApplication, defaultQueryService)
     val lotteryServer: HttpRequest => Future[HttpResponse] =
       ServiceHandler.concatOrNotFound(
         LotteryServiceHandler.partial(lotteryServiceImpl),
