@@ -10,7 +10,7 @@ import org.scalatest.matchers.must.Matchers
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.slf4j.LoggerFactory
-import query.model.{Lottery, LotteryState, LotteryWinner}
+import query.model.{Lottery, LotteryParticipant, LotteryState, LotteryWinner}
 import query.schema.LotterySchema
 import query.service.DefaultQueryService
 
@@ -49,7 +49,8 @@ class DefaultQueryServiceSpec
 
     try {
       val operations = DBIO.seq(
-        lotterySchema.LotteryQuery.schema.create
+        lotterySchema.LotteryQuery.schema.create,
+        lotterySchema.lotteryParticipants.schema.create
       )
       whenReady(slickSession.db.run(operations), timeout(Span(6, Seconds)), interval(Span(2, Seconds))) { _ =>
         Logger.info("lottery schema table has been created.")
@@ -57,7 +58,9 @@ class DefaultQueryServiceSpec
       withFixture(test.toNoArgTest(new TestFixture(actorTestKit, slickSession, lotterySchema)))
     } finally {
       val operations = DBIO.seq(
-        lotterySchema.LotteryQuery.schema.dropIfExists
+        lotterySchema.LotteryQuery.schema.dropIfExists,
+        lotterySchema.lotteryParticipants.schema.dropIfExists
+
       )
       whenReady(slickSession.db.run(operations), timeout(Span(6, Seconds))) { _ =>
         Logger.info("lottery schema table has been dropped.")
@@ -144,31 +147,33 @@ class DefaultQueryServiceSpec
 
       val inputDate = LocalDate.now().minusDays(2)
 
-      val finishedLotteries = Seq(
-        Lottery(
-          id = UUID.randomUUID().toString,
-          name = Random.alphanumeric.take(12).mkString,
-          createdAt = LocalDate.now().minusDays(2),
-          state = LotteryState.Closed,
-          winner = Some(UUID.randomUUID().toString)
-        ),
-        Lottery(
-          id = UUID.randomUUID().toString,
-          name = Random.alphanumeric.take(12).mkString,
-          createdAt = LocalDate.now().minusDays(2),
-          state = LotteryState.Closed,
-          winner = Some(UUID.randomUUID().toString)
-        )
+      val winnerId = UUID.randomUUID().toString
+      val lotteryId = UUID.randomUUID().toString
+
+      val participant = LotteryParticipant(
+        participantId = winnerId,
+        participantFirstName = Random.alphanumeric.take(12).mkString,
+        participantLastName = Random.alphanumeric.take(12).mkString,
+        lotteryId = lotteryId
       )
 
-      val lotteryWinners = finishedLotteries.map(lotteryWinner =>
-        LotteryWinner(
-          lotteryId = lotteryWinner.id,
-          lottery_name = lotteryWinner.name,
-          creationDate = lotteryWinner.createdAt,
-          winnerId = lotteryWinner.winner
+      val finishedLottery =
+        Lottery(
+          id = lotteryId,
+          name = Random.alphanumeric.take(12).mkString,
+          createdAt = LocalDate.now().minusDays(2),
+          state = LotteryState.Closed,
+          winner = Some(winnerId)
         )
-      )
+
+      val lotteryWinner =
+        LotteryWinner(
+          lotteryId = finishedLottery.id,
+          lotteryName = finishedLottery.name,
+          participantFirstName = participant.participantFirstName,
+          participantLastName = participant.participantLastName,
+          creationDate = finishedLottery.createdAt,
+          winnerId = finishedLottery.winner)
 
 
       "return valid result" in { testFixture =>
@@ -178,7 +183,8 @@ class DefaultQueryServiceSpec
         import testFixture.{lotterySchema, slickSession}
 
         val operations = DBIO.seq(
-          lotterySchema.LotteryQuery ++= finishedLotteries
+          lotterySchema.LotteryQuery += finishedLottery,
+          lotterySchema.lotteryParticipants += participant,
         )
         whenReady(slickSession.db.run(operations.transactionally), timeout(Span(5, Seconds))) { _ =>
 
@@ -187,7 +193,7 @@ class DefaultQueryServiceSpec
           queryService.fetchLotteriesWinnersByDate(inputDate)
             .futureValue(timeout(Span(5, Seconds)))
             .sortBy(_.lotteryId)
-            .mustBe(lotteryWinners.sortBy(_.lotteryId))
+            .mustBe(Seq(lotteryWinner))
         }
       }
     }

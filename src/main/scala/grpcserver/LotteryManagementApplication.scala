@@ -66,6 +66,8 @@ final class LotteryManagementApplication(context: ActorContext[_]) {
           grpcPort,
           lotteryServer))
 
+    context.watch(lotteryServerRef)
+
     Behaviors.receiveSignal[Nothing] {
       case (_, Terminated(_)) =>
         Behaviors.stopped

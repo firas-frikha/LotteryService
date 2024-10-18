@@ -3,7 +3,7 @@ package grpcserver.service
 import akka.actor.testkit.typed.scaladsl.ActorTestKit
 import akka.actor.typed.ActorRef
 import com.google.protobuf.empty.Empty
-import core.LotteryEntity
+import core.{LotteryEntity, Participant}
 import core.LotteryEntity.{SuccessfulCreateResult, SuccessfulParticipateResult, UnsupportedCreateResult, UnsupportedParticipateResult}
 import lottery.service._
 import org.scalamock.scalatest.MockFactory
@@ -93,18 +93,25 @@ class LotteryServiceImplSpec
     "Participating in lottery" when {
 
       val lotteryId: String = UUID.randomUUID().toString
-      val ballotId: String = UUID.randomUUID().toString
+      val participantId: String = UUID.randomUUID().toString
       val participateInLotteryRequest =
         ParticipateInLotteryRequest(
-          lotteryId = lotteryId.toString
+          lotteryId = lotteryId
         )
 
       "return valid ParticipateToLotteryResponse" in {
         import testKit.system
+
+        val participant = Participant(
+          participantId = participantId,
+          participantFirstName = Random.alphanumeric.take(12).mkString,
+          participantLastName = Random.alphanumeric.take(12).mkString
+        )
+
         val lotteryServiceApplicationMock = mock[LotteryServiceApplication]
         (lotteryServiceApplicationMock.participateInLottery(_: String, _: ActorRef[LotteryEntity.ParticipateResult] => LotteryEntity.ParticipateCommand))
           .expects(*, *)
-          .returns(Future(SuccessfulParticipateResult(ballotId)))
+          .returns(Future(SuccessfulParticipateResult(participant)))
 
         val queryServiceMock = mock[QueryService]
 
@@ -114,7 +121,7 @@ class LotteryServiceImplSpec
 
         lotteryServiceImpl.participateInLottery(participateInLotteryRequest)
           .futureValue(timeout(Span(5, Seconds)))
-          .mustBe(ParticipateInLotteryResponse(ballotId = ballotId.toString))
+          .mustBe(ParticipateInLotteryResponse(ballotId = participant.participantId))
       }
       "lotteryServiceApplication fails" in {
         import testKit.system
@@ -214,13 +221,17 @@ class LotteryServiceImplSpec
         val queryServiceResponse = Seq(
           LotteryWinner(
             lotteryId = UUID.randomUUID().toString,
-            lottery_name = Random.alphanumeric.take(12).mkString,
+            lotteryName = Random.alphanumeric.take(12).mkString,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString,
             creationDate = inputDate,
             winnerId = Some(UUID.randomUUID().toString)
           ),
           LotteryWinner(
             lotteryId = UUID.randomUUID().toString,
-            lottery_name = Random.alphanumeric.take(12).mkString,
+            lotteryName = Random.alphanumeric.take(12).mkString,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString,
             creationDate = inputDate,
             winnerId = Some(UUID.randomUUID().toString)
           )
@@ -241,7 +252,9 @@ class LotteryServiceImplSpec
               queryServiceResponse.map(lotteryWinner =>
                 lottery.service.LotteryResult(
                   lotteryId = lotteryWinner.lotteryId,
-                  lotteryName = lotteryWinner.lottery_name,
+                  lotteryName = lotteryWinner.lotteryName,
+                  winnerFirstName = lotteryWinner.participantFirstName,
+                  winnerLastName = lotteryWinner.participantLastName,
                   lotteryCreationDate =
                     Some(Date(
                       year = lotteryWinner.creationDate.getYear,

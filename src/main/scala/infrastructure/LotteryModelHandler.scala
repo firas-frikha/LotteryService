@@ -3,7 +3,7 @@ package infrastructure
 import akka.projection.eventsourced.EventEnvelope
 import akka.projection.jdbc.scaladsl.JdbcHandler
 import core.LotteryEntity
-import core.LotteryEntity.{BallotAddedEvent, ClosedLotteryEvent, CreatedLotteryEvent}
+import core.LotteryEntity.{ParticipantAddedEvent, ClosedLotteryEvent, CreatedLotteryEvent}
 import infrastructure.LotteryModelHandler._
 import org.slf4j.LoggerFactory
 import query.model.LotteryState
@@ -16,7 +16,7 @@ class LotteryModelHandler() extends JdbcHandler[EventEnvelope[LotteryEntity.Even
     envelope.event match {
       case createdLotteryEvent: LotteryEntity.CreatedLotteryEvent =>
         process(session, createdLotteryEvent)
-      case ballotAddedEvent: LotteryEntity.BallotAddedEvent =>
+      case ballotAddedEvent: LotteryEntity.ParticipantAddedEvent =>
         process(session, ballotAddedEvent)
       case closedLotteryEvent: LotteryEntity.ClosedLotteryEvent =>
         process(session, closedLotteryEvent)
@@ -37,7 +37,7 @@ class LotteryModelHandler() extends JdbcHandler[EventEnvelope[LotteryEntity.Even
     session.withConnection { connection =>
       val preparedStatement = connection.prepareStatement(UpdateLotteryState)
       preparedStatement.setString(1, LotteryState.Closed.toString)
-      preparedStatement.setString(2, closedLotteryEvent.winner.orNull)
+      preparedStatement.setString(2, closedLotteryEvent.winner.map(_.participantId).orNull)
 
       preparedStatement.setString(3, closedLotteryEvent.id)
 
@@ -49,15 +49,17 @@ class LotteryModelHandler() extends JdbcHandler[EventEnvelope[LotteryEntity.Even
         Log.warn("Update Command cannot be executed, lottery with id: {} may not exist", closedLotteryEvent.id)
     }
 
-  private[this] def process(session: SlickJdbcSession, ballotAddedEvent: BallotAddedEvent): Unit =
+  private[this] def process(session: SlickJdbcSession, ballotAddedEvent: ParticipantAddedEvent): Unit =
     session.withConnection { connection =>
 
       if (selectLotteryById(ballotAddedEvent.id, connection)) {
-        ballotAddedEvent.newBallotsList.foreach { ballotId =>
-          if (!selectParticipantById(ballotId, connection)) {
+        ballotAddedEvent.lotteryParticipant.foreach { participant =>
+          if (!selectParticipantById(participant.participantId, connection)) {
             val preparedStatement = connection.prepareStatement(AddParticipantToLotterySql)
-            preparedStatement.setString(1, ballotId)
-            preparedStatement.setString(2, ballotAddedEvent.id)
+            preparedStatement.setString(1, participant.participantId)
+            preparedStatement.setString(2, participant.participantFirstName)
+            preparedStatement.setString(3, participant.participantLastName)
+            preparedStatement.setString(4, ballotAddedEvent.id)
             preparedStatement.executeUpdate()
           } else {
             Log.warn("Participant already registered to lottery")
@@ -111,6 +113,6 @@ object LotteryModelHandler {
   private final val LotteryInsertSql = "INSERT INTO lotteries(lottery_id, lottery_name, created_at, lottery_state) VALUES(?, ?, ?, ?)"
   private final val UpdateLotteryState = "UPDATE lotteries SET lottery_state = ?, winner = ? WHERE lottery_id = ?"
 
-  private final val AddParticipantToLotterySql = "INSERT INTO lottery_participants(participant_id, lottery_id) VALUES(?,?)"
+  private final val AddParticipantToLotterySql = "INSERT INTO lottery_participants(participant_id, participant_first_name, participant_last_name, lottery_id) VALUES(?, ?, ?, ?)"
   private final val ParticipantExistSelectSql = "SELECT Count(participant_id) from lottery_participants WHERE participant_id = ?"
 }

@@ -5,8 +5,8 @@ import akka.persistence.query.Offset
 import akka.projection.eventsourced.EventEnvelope
 import akka.stream.alpakka.slick.scaladsl.SlickSession
 import com.typesafe.config.ConfigFactory
-import core.LotteryEntity
-import core.LotteryEntity.{BallotAddedEvent, ClosedLotteryEvent, CreatedLotteryEvent}
+import core.LotteryEntity.{ClosedLotteryEvent, CreatedLotteryEvent, ParticipantAddedEvent}
+import core.{LotteryEntity, Participant}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Outcome
 import org.scalatest.concurrent.ScalaFutures
@@ -75,8 +75,8 @@ class LotteryModelHandlerSpec
       "successfully persist data" when {
         "lottery do not exist" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
           val lotteryId = UUID.randomUUID().toString
 
@@ -120,8 +120,8 @@ class LotteryModelHandlerSpec
         "do persist data" when {
 
           "lottery exists" in { testFixture =>
-            import testFixture.slickSession.profile.api._
             import testFixture.slickSession
+            import testFixture.slickSession.profile.api._
 
             val lotteryId = UUID.randomUUID().toString
 
@@ -187,11 +187,16 @@ class LotteryModelHandlerSpec
       "successfully persist data" when {
         "lottery exists" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
           val lotteryId = UUID.randomUUID().toString
           val participantId = UUID.randomUUID().toString
+
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString)
 
           val createdLotteryEvent = CreatedLotteryEvent(
             id = lotteryId,
@@ -199,13 +204,15 @@ class LotteryModelHandlerSpec
             createdAt = LocalDate.now()
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val participantAddedEvent = ParticipantAddedEvent(
             id = lotteryId,
-            newBallotsList = Set(participantId)
+            lotteryParticipant = Set(participant)
           )
 
           val savedParticipants = LotteryParticipant(
             participantId = participantId,
+            participantFirstName = participant.participantFirstName,
+            participantLastName = participant.participantLastName,
             lotteryId = lotteryId
           )
 
@@ -229,9 +236,9 @@ class LotteryModelHandlerSpec
             slickJdbcSession,
             EventEnvelope.create[LotteryEntity.Event](
               Offset.noOffset,
-              ballotAddedEvent.id,
+              participantAddedEvent.id,
               Random.nextLong(),
-              ballotAddedEvent,
+              participantAddedEvent,
               System.currentTimeMillis()
             )
           )
@@ -249,16 +256,23 @@ class LotteryModelHandlerSpec
       "do not persist data" when {
         "lottery do not exist" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
 
           val lotteryId = UUID.randomUUID().toString
-          val participantIds = Set(UUID.randomUUID().toString)
+          val participantId = UUID.randomUUID().toString
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+
+          )
+
+          val participantAddedEvent = ParticipantAddedEvent(
             id = lotteryId,
-            newBallotsList = participantIds
+            lotteryParticipant = Set(participant)
           )
 
           val handler = new LotteryModelHandler()
@@ -269,9 +283,9 @@ class LotteryModelHandlerSpec
             slickJdbcSession,
             EventEnvelope.create[LotteryEntity.Event](
               Offset.noOffset,
-              ballotAddedEvent.id,
+              participantAddedEvent.id,
               Random.nextLong(),
-              ballotAddedEvent,
+              participantAddedEvent,
               System.currentTimeMillis()
             )
           )
@@ -291,12 +305,11 @@ class LotteryModelHandlerSpec
       "successfully persist data" when {
         "lottery exists" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
           val lotteryId = UUID.randomUUID().toString
           val participantId = UUID.randomUUID().toString
-          val participantIds = Set(participantId)
 
           val createdLotteryEvent = CreatedLotteryEvent(
             id = lotteryId,
@@ -304,24 +317,29 @@ class LotteryModelHandlerSpec
             createdAt = LocalDate.now()
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString)
+
+          val participantAddedEvent = ParticipantAddedEvent(
             id = lotteryId,
-            newBallotsList = participantIds
+            lotteryParticipant = Set(participant)
           )
 
           val LotteryClosedEvent = ClosedLotteryEvent(
             id = lotteryId,
             lotteryName = createdLotteryEvent.lotteryName,
             createdAt = createdLotteryEvent.createdAt,
-            ballotsList = ballotAddedEvent.newBallotsList,
-            winner = Option(participantId)
+            participants = participantAddedEvent.lotteryParticipant,
+            winner = Option(participant)
           )
 
           val closedLotteryRecord = Lottery(
             id = createdLotteryEvent.id,
             name = createdLotteryEvent.lotteryName,
             createdAt = createdLotteryEvent.createdAt,
-            winner = LotteryClosedEvent.winner,
+            winner = LotteryClosedEvent.winner.map(_.participantId),
             state = LotteryState.Closed
           )
 
@@ -345,9 +363,9 @@ class LotteryModelHandlerSpec
             slickJdbcSession,
             EventEnvelope.create[LotteryEntity.Event](
               Offset.noOffset,
-              ballotAddedEvent.id,
+              participantAddedEvent.id,
               Random.nextLong(),
-              ballotAddedEvent,
+              participantAddedEvent,
               System.currentTimeMillis()
             )
           )
@@ -374,8 +392,8 @@ class LotteryModelHandlerSpec
 
         "lottery exists but no participant" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
           val lotteryId = UUID.randomUUID().toString
 
@@ -390,7 +408,7 @@ class LotteryModelHandlerSpec
             id = lotteryId,
             lotteryName = createdLotteryEvent.lotteryName,
             createdAt = createdLotteryEvent.createdAt,
-            ballotsList = Set.empty,
+            participants = Set.empty,
             winner = None
           )
 
@@ -440,21 +458,26 @@ class LotteryModelHandlerSpec
       "do not persist data" when {
         "lottery dot not exist" in { testFixture =>
 
-          import testFixture.slickSession.profile.api._
           import testFixture.slickSession
+          import testFixture.slickSession.profile.api._
 
 
           val lotteryId = UUID.randomUUID().toString
           val participantId = UUID.randomUUID().toString
 
-          val ballotsList = Set(UUID.randomUUID().toString)
+          val participant =
+            Participant(
+              participantId = participantId,
+              participantFirstName = Random.alphanumeric.take(12).mkString,
+              participantLastName = Random.alphanumeric.take(12).mkString
+            )
 
           val LotteryClosedEvent = ClosedLotteryEvent(
             id = lotteryId,
             lotteryName = UUID.randomUUID().toString,
             createdAt = LocalDate.now(),
-            ballotsList = ballotsList,
-            winner = Option(participantId)
+            participants = Set(participant),
+            winner = Option(participant)
           )
 
 

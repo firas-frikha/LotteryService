@@ -2,7 +2,7 @@ package grpcserver.service
 
 import akka.actor.typed.{ActorRef, ActorSystem}
 import com.google.protobuf.empty.Empty
-import core.LotteryEntity
+import core.{LotteryEntity, Participant}
 import lottery.service._
 import query.service.QueryService
 
@@ -30,10 +30,15 @@ class LotteryServiceImpl(lotteryServiceApplication: LotteryServiceApplication,
 
   override def participateInLottery(in: ParticipateInLotteryRequest): Future[ParticipateInLotteryResponse] = {
     val ballotId = UUID.randomUUID().toString
-    val participateCommand = (replyTo: ActorRef[LotteryEntity.ParticipateResult]) => LotteryEntity.ParticipateCommand(ballotId)(replyTo)
+    val participant = Participant(
+      participantId = ballotId,
+      participantFirstName = in.participantFirstName,
+      participantLastName = in.participantLastName)
+
+    val participateCommand = (replyTo: ActorRef[LotteryEntity.ParticipateResult]) => LotteryEntity.ParticipateCommand(participant)(replyTo)
     lotteryServiceApplication.participateInLottery(in.lotteryId, participateCommand).map {
-      case LotteryEntity.SuccessfulParticipateResult(ballotId) =>
-        ParticipateInLotteryResponse(ballotId = ballotId)
+      case LotteryEntity.SuccessfulParticipateResult(participant) =>
+        ParticipateInLotteryResponse(ballotId = participant.participantId)
       case LotteryEntity.UnsupportedParticipateResult(message) =>
         throw new UnsupportedOperationException(message)
     }
@@ -62,9 +67,11 @@ class LotteryServiceImpl(lotteryServiceApplication: LotteryServiceApplication,
             lotteryWinners.map(lotteryWinner =>
               LotteryResult(
                 lotteryId = lotteryWinner.lotteryId,
-                lotteryName = lotteryWinner.lottery_name,
+                lotteryName = lotteryWinner.lotteryName,
                 lotteryCreationDate = Some(toDate(lotteryWinner.creationDate)),
-                lotteryWinner = lotteryWinner.winnerId)
+                lotteryWinner = lotteryWinner.winnerId,
+                winnerFirstName = lotteryWinner.participantFirstName,
+                winnerLastName = lotteryWinner.participantLastName)
             )
         )
       )

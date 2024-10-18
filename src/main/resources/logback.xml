@@ -13,7 +13,6 @@
         <appender-ref ref="STDOUT"/>
     </appender>
 
-
     <!-- Reduce Slick logging -->
     <logger name="slick.jdbc" level="WARN"/>
     <logger name="com.zaxxer.hikari" level="WARN"/>

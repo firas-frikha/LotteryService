@@ -37,6 +37,10 @@ final class LotterySchema(session: SlickSession) {
 
     def lotteryId: Rep[String] = column[String]("lottery_id")
 
-    override def * : ProvenShape[LotteryParticipant] = (participantId, lotteryId) <> (LotteryParticipant.tupled, LotteryParticipant.unapply)
+    def participantFirstName: Rep[String] = column[String]("participant_first_name")
+
+    def participantLastName: Rep[String] = column[String]("participant_last_name")
+
+    override def * : ProvenShape[LotteryParticipant] = (participantId, participantFirstName, participantLastName, lotteryId) <> (LotteryParticipant.tupled, LotteryParticipant.unapply)
   }
 }

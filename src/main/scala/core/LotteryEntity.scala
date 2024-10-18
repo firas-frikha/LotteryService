@@ -10,7 +10,6 @@ import scala.util.Random
 
 object LotteryEntity {
   type Id = String
-  type BallotId = String
   type CreatedAt = LocalDate
 
   //Define the Tag:
@@ -39,14 +38,11 @@ object LotteryEntity {
   case class CreateCommand(lotteryName: String)
                           (val replyTo: ActorRef[CreateResult]) extends Command
 
-  case class ParticipateCommand(ballotId: BallotId)
+  case class ParticipateCommand(participant: Participant)
                                (val replyTo: ActorRef[ParticipateResult]) extends Command
 
   case class CloseLotteryCommand()
                                 (val replyTo: ActorRef[CloseResult]) extends Command
-
-  case class FetchLotteryWinner()
-                               (val replyTo: ActorRef[FetchLotteryWinnerResult]) extends Command
 
   // Events that will be saved by the lottery entity
   sealed trait Event {
@@ -59,14 +55,14 @@ object LotteryEntity {
                                        lotteryName: String,
                                        createdAt: CreatedAt) extends Event
 
-  final case class BallotAddedEvent(override val id: Id,
-                                    newBallotsList: Set[BallotId]) extends Event
+  final case class ParticipantAddedEvent(override val id: Id,
+                                         lotteryParticipant: Set[Participant]) extends Event
 
   final case class ClosedLotteryEvent(override val id: Id,
                                       lotteryName: String,
                                       createdAt: CreatedAt,
-                                      ballotsList: Set[BallotId],
-                                      winner: Option[BallotId]) extends Event
+                                      participants: Set[Participant],
+                                      winner: Option[Participant]) extends Event
 
   // Results of the executed commands
   sealed trait Result
@@ -82,7 +78,7 @@ object LotteryEntity {
 
   sealed trait ParticipateResult extends Result
 
-  final case class SuccessfulParticipateResult(ballotId: BallotId) extends ParticipateResult
+  final case class SuccessfulParticipateResult(participant: Participant) extends ParticipateResult
 
   final case class UnsupportedParticipateResult(message: String) extends ParticipateResult
 
@@ -93,14 +89,6 @@ object LotteryEntity {
   final case class SuccessfulCloseResult(message: String) extends CloseResult
 
   final case class UnsupportedCloseResult(message: String) extends CloseResult
-
-  // Results of Fetch winner command
-
-  sealed trait FetchLotteryWinnerResult extends Result
-
-  final case class SuccessfulFetchLotteryWinnerResult(winner: Option[BallotId]) extends FetchLotteryWinnerResult
-
-  final case class UnsupportedFetchLotteryWinnerResult(message: String) extends FetchLotteryWinnerResult
 
   sealed trait State {
     def id: Id
@@ -127,9 +115,6 @@ object LotteryEntity {
           Effect.reply(actualCommand.replyTo)(UnsupportedParticipateResult(s"Cannot Process ${actualCommand.getClass.getSimpleName} command, because lottery with id: $id do not exist!"))
         case actualCommand: CloseLotteryCommand =>
           Effect.reply(actualCommand.replyTo)(UnsupportedCloseResult(s"Cannot Process ${actualCommand.getClass.getSimpleName} command, because lottery with id: $id do not exist!"))
-        case actualCommand: FetchLotteryWinner =>
-          Effect.reply(actualCommand.replyTo)(UnsupportedFetchLotteryWinnerResult(s"Cannot Process ${actualCommand.getClass.getSimpleName} command, because lottery with id: $id do not exist!"))
-
       }
 
     override def applyEvent(event: Event): State =
@@ -139,7 +124,7 @@ object LotteryEntity {
             id = id,
             createdAt = createdEvent.createdAt,
             lotteryName = createdEvent.lotteryName,
-            registeredBallots = Set.empty)
+            currentParticipant = Set.empty)
         case _ =>
           throw new IllegalStateException(s"Unexpected ${event.getClass.getSimpleName} event in '${getClass.getSimpleName} state for entity '$id")
       }
@@ -149,21 +134,21 @@ object LotteryEntity {
   case class ActiveState(override val id: Id,
                          createdAt: CreatedAt,
                          lotteryName: String,
-                         registeredBallots: Set[BallotId]) extends State {
+                         currentParticipant: Set[Participant]) extends State {
     override def applyCommand(command: Command,
                               clock: Clock): ReplyEffect[Event, State] =
       command match {
         case actualCommand: CreateCommand =>
           Effect.reply(actualCommand.replyTo)(UnsupportedCreateResult(s"Cannot Process ${actualCommand.getClass.getSimpleName} command, because lottery with '$id' is already created!"))
         case actualCommand: ParticipateCommand =>
-          Effect.persist(BallotAddedEvent(
+          Effect.persist(ParticipantAddedEvent(
             id = id,
-            newBallotsList = registeredBallots + actualCommand.ballotId)
-          ).thenReply(actualCommand.replyTo)(_ => SuccessfulParticipateResult(actualCommand.ballotId))
+            lotteryParticipant = currentParticipant + actualCommand.participant)
+          ).thenReply(actualCommand.replyTo)(_ => SuccessfulParticipateResult(actualCommand.participant))
         case actualCommand: CloseLotteryCommand =>
           val winner =
-            if (registeredBallots.nonEmpty)
-              Some(registeredBallots.toVector(Random.nextInt(registeredBallots.size)))
+            if (currentParticipant.nonEmpty)
+              Some(currentParticipant.toVector(Random.nextInt(currentParticipant.size)))
             else
               None
           Effect.persist(
@@ -171,19 +156,17 @@ object LotteryEntity {
               id = id,
               lotteryName = lotteryName,
               createdAt = createdAt,
-              ballotsList = registeredBallots,
+              participants = currentParticipant,
               winner = winner
             )
           ).thenReply(actualCommand.replyTo)(_ => SuccessfulCloseResult(s"Lottery with id $id is closed, the winner is $winner"))
-        case actualCommand: FetchLotteryWinner =>
-          Effect.reply(actualCommand.replyTo)(UnsupportedFetchLotteryWinnerResult(s"Cannot Process ${actualCommand.getClass.getSimpleName} command, because lottery with id: $id is not closed yet!"))
       }
 
     override def applyEvent(event: Event): State =
       event match {
-        case actualEvent: BallotAddedEvent =>
+        case actualEvent: ParticipantAddedEvent =>
           copy(
-            registeredBallots = actualEvent.newBallotsList
+            currentParticipant = actualEvent.lotteryParticipant
           )
 
         case actualEvent: ClosedLotteryEvent =>
@@ -191,7 +174,7 @@ object LotteryEntity {
             id = id,
             lotteryName = lotteryName,
             createdAt = createdAt,
-            finalBallots = registeredBallots,
+            finalParticipant = currentParticipant,
             winner = actualEvent.winner)
 
         case actualEvent: CreatedLotteryEvent => throw new IllegalStateException(s"Unexpected ${actualEvent.getClass.getSimpleName} event in ${getClass.getSimpleName} state for entity '$id'!")
@@ -201,13 +184,11 @@ object LotteryEntity {
   case class ClosedState(override val id: Id,
                          lotteryName: String,
                          createdAt: CreatedAt,
-                         finalBallots: Set[BallotId],
-                         winner: Option[BallotId]) extends State {
+                         finalParticipant: Set[Participant],
+                         winner: Option[Participant]) extends State {
     override def applyCommand(command: Command,
                               clock: Clock): ReplyEffect[Event, State] =
       command match {
-        case actualCommand: FetchLotteryWinner =>
-          Effect.reply(actualCommand.replyTo)(SuccessfulFetchLotteryWinnerResult(winner))
         case actualCommand: CreateCommand =>
           Effect.reply(actualCommand.replyTo)(UnsupportedCreateResult(s"Cannot process ${actualCommand.getClass.getSimpleName} command, because lottery with id: '$id' is closed!"))
         case actualCommand: ParticipateCommand =>

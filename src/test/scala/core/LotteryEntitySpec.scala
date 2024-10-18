@@ -60,13 +60,18 @@ class LotteryEntitySpec
         "reply with UnsupportedParticipateResult" in {
           val ballotId = UUID.randomUUID().toString
 
+          val participant = Participant(
+            participantId = ballotId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+          )
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
             behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val failedResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
-            ParticipateCommand(ballotId)
+            ParticipateCommand(participant)
           )
 
           failedResult.hasNoEvents shouldBe true
@@ -80,7 +85,7 @@ class LotteryEntitySpec
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val failedResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CloseResult](
@@ -90,24 +95,6 @@ class LotteryEntitySpec
           failedResult.hasNoEvents shouldBe true
           failedResult.stateOfType[LotteryEntity.EmptyState].id shouldBe entityId
           failedResult.reply should ===(LotteryEntity.UnsupportedCloseResult(s"Cannot Process ${classOf[LotteryEntity.CloseLotteryCommand].getSimpleName} command, because lottery with id: $entityId do not exist!"))
-        }
-      }
-
-      "receiving FetchLotteryWinner command" must {
-        "reply with UnsupportedFetchLotteryWinnerResult" in {
-
-          val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
-            system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
-          )
-
-          val failedResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.FetchLotteryWinnerResult](
-            FetchLotteryWinner()
-          )
-
-          failedResult.hasNoEvents shouldBe true
-          failedResult.stateOfType[LotteryEntity.EmptyState].id shouldBe entityId
-          failedResult.reply should ===(LotteryEntity.UnsupportedFetchLotteryWinnerResult(s"Cannot Process ${classOf[LotteryEntity.FetchLotteryWinner].getSimpleName} command, because lottery with id: $entityId do not exist!"))
         }
       }
     }
@@ -158,15 +145,21 @@ class LotteryEntitySpec
         "reply with SuccessfulParticipateResult" in {
           val ballotId = UUID.randomUUID().toString
 
+          val participant = Participant(
+            participantId = ballotId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+          )
+
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
             lotteryName = lotteryName,
             createdAt = LocalDate.now(clock)
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val ballotAddedEvent = ParticipantAddedEvent(
             id = entityId,
-            newBallotsList = Set(ballotId)
+            lotteryParticipant = Set(participant)
           )
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
@@ -188,7 +181,7 @@ class LotteryEntitySpec
 
           val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
             LotteryEntity.ParticipateCommand(
-              ballotId = ballotId
+              participant = participant
             )
           )
 
@@ -196,7 +189,7 @@ class LotteryEntitySpec
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
+          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(participant)
         }
       }
 
@@ -236,68 +229,19 @@ class LotteryEntitySpec
           successfulCloseResult.stateOfType[LotteryEntity.ClosedState].createdAt shouldBe createdEvent.createdAt
         }
       }
-
-      "receiving FetchLotteryWinner command" must {
-        "reply with UnsupportedFetchLotteryWinnerResult" in {
-          val ballotId = UUID.randomUUID().toString
-
-          val createdEvent = CreatedLotteryEvent(
-            id = entityId,
-            lotteryName = lotteryName,
-            createdAt = LocalDate.now(clock)
-          )
-
-          val ballotAddedEvent = BallotAddedEvent(
-            id = entityId,
-            newBallotsList = Set(ballotId)
-          )
-
-          val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
-            system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
-          )
-
-          val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](
-            LotteryEntity.CreateCommand(
-              lotteryName = lotteryName
-            )
-          )
-
-          successfulCreateResult.event shouldBe createdEvent
-          successfulCreateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
-          successfulCreateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
-          successfulCreateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulCreateResult.reply shouldBe LotteryEntity.SuccessfulCreateResult(createdEvent.id)
-
-          val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
-            LotteryEntity.ParticipateCommand(
-              ballotId = ballotId
-            )
-          )
-
-          successfulParticipateResult.event shouldBe ballotAddedEvent
-          successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
-          successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
-          successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
-
-          val unsupportedFetchLotteryWinnerResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.FetchLotteryWinnerResult](
-            LotteryEntity.FetchLotteryWinner()
-          )
-
-          unsupportedFetchLotteryWinnerResult.hasNoEvents shouldBe true
-          unsupportedFetchLotteryWinnerResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
-          unsupportedFetchLotteryWinnerResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
-          unsupportedFetchLotteryWinnerResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-        }
-      }
     }
 
 
     "is in ClosedState" when {
       "receiving CreateCommand" must {
         "reply with UnsupportedCreateResult" in {
-          val ballotId = UUID.randomUUID().toString
+          val participantId = UUID.randomUUID().toString
+
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+          )
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
@@ -307,7 +251,7 @@ class LotteryEntitySpec
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](
@@ -324,20 +268,20 @@ class LotteryEntitySpec
 
           val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
             LotteryEntity.ParticipateCommand(
-              ballotId = ballotId
+              participant = participant
             )
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val ballotAddedEvent = ParticipantAddedEvent(
             id = entityId,
-            newBallotsList = Set(ballotId)
+            lotteryParticipant = Set(participant)
           )
 
           successfulParticipateResult.event shouldBe ballotAddedEvent
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
+          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(participant)
 
 
           val successfulCloseResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CloseResult](
@@ -367,7 +311,13 @@ class LotteryEntitySpec
 
       "receiving Participate command" must {
         "reply with UnsupportedParticipateResult" in {
-          val ballotId = UUID.randomUUID().toString
+          val participantId = UUID.randomUUID().toString
+
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+          )
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
@@ -377,7 +327,7 @@ class LotteryEntitySpec
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](
@@ -394,20 +344,20 @@ class LotteryEntitySpec
 
           val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
             LotteryEntity.ParticipateCommand(
-              ballotId = ballotId
+              participant = participant
             )
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val ballotAddedEvent = ParticipantAddedEvent(
             id = entityId,
-            newBallotsList = Set(ballotId)
+            lotteryParticipant = Set(participant)
           )
 
           successfulParticipateResult.event shouldBe ballotAddedEvent
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
+          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(participant)
 
 
           val successfulCloseResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CloseResult](
@@ -421,7 +371,7 @@ class LotteryEntitySpec
 
 
           val unsupportedCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
-            LotteryEntity.ParticipateCommand(ballotId)
+            LotteryEntity.ParticipateCommand(participant)
           )
 
           unsupportedCreateResult.hasNoEvents shouldBe true
@@ -435,7 +385,13 @@ class LotteryEntitySpec
 
       "receiving CloseLottery command" must {
         "reply with UnsupportedSuccessfulCloseResult" in {
-          val ballotId = UUID.randomUUID().toString
+          val participantId = UUID.randomUUID().toString
+
+          val participant = Participant(
+            participantId = participantId,
+            participantFirstName = Random.alphanumeric.take(12).mkString,
+            participantLastName = Random.alphanumeric.take(12).mkString
+          )
 
           val createdEvent = CreatedLotteryEvent(
             id = entityId,
@@ -445,7 +401,7 @@ class LotteryEntitySpec
 
           val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
             system = system,
-            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId.toString), clock)
+            behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
           )
 
           val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](
@@ -462,20 +418,20 @@ class LotteryEntitySpec
 
           val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
             LotteryEntity.ParticipateCommand(
-              ballotId = ballotId
+              participant = participant
             )
           )
 
-          val ballotAddedEvent = BallotAddedEvent(
+          val ballotAddedEvent = ParticipantAddedEvent(
             id = entityId,
-            newBallotsList = Set(ballotId)
+            lotteryParticipant = Set(participant)
           )
 
           successfulParticipateResult.event shouldBe ballotAddedEvent
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
           successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
+          successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(participant)
 
 
           val successfulCloseResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CloseResult](
@@ -499,73 +455,6 @@ class LotteryEntitySpec
           unsupportedCreateResult.reply shouldBe LotteryEntity.UnsupportedCloseResult(s"Cannot process ${classOf[LotteryEntity.CloseLotteryCommand].getSimpleName} command, because lottery with id: '$entityId' is already closed!")
 
         }
-      }
-    }
-
-    "receiving FetchLotteryWinner command" must {
-      "reply with SuccessfulFetchLotteryWinnerResult" in {
-        val ballotId = UUID.randomUUID().toString
-
-        val createdEvent = CreatedLotteryEvent(
-          id = entityId,
-          lotteryName = lotteryName,
-          createdAt = LocalDate.now(clock)
-        )
-
-        val eventSourcedBehaviorTestKit = EventSourcedBehaviorTestKit[LotteryEntity.Command, LotteryEntity.Event, LotteryEntity.State](
-          system = system,
-          behavior = LotteryEntity(entityId, PersistenceId.ofUniqueId(entityId), clock)
-        )
-
-        val successfulCreateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CreateResult](
-          LotteryEntity.CreateCommand(
-            lotteryName = lotteryName
-          )
-        )
-
-        successfulCreateResult.event shouldBe createdEvent
-        successfulCreateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
-        successfulCreateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
-        successfulCreateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-        successfulCreateResult.reply shouldBe LotteryEntity.SuccessfulCreateResult(createdEvent.id)
-
-        val successfulParticipateResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.ParticipateResult](
-          LotteryEntity.ParticipateCommand(
-            ballotId = ballotId
-          )
-        )
-
-        val ballotAddedEvent = BallotAddedEvent(
-          id = entityId,
-          newBallotsList = Set(ballotId)
-        )
-
-        successfulParticipateResult.event shouldBe ballotAddedEvent
-        successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].id shouldBe createdEvent.id
-        successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].lotteryName shouldBe lotteryName
-        successfulParticipateResult.stateOfType[LotteryEntity.ActiveState].createdAt shouldBe createdEvent.createdAt
-        successfulParticipateResult.reply shouldBe LotteryEntity.SuccessfulParticipateResult(ballotId)
-
-
-        val successfulCloseResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.CloseResult](
-          LotteryEntity.CloseLotteryCommand()
-        )
-
-        successfulCloseResult.event shouldBe a[ClosedLotteryEvent]
-        successfulCloseResult.stateOfType[LotteryEntity.ClosedState].id shouldBe createdEvent.id
-        successfulCloseResult.stateOfType[LotteryEntity.ClosedState].lotteryName shouldBe lotteryName
-        successfulCloseResult.stateOfType[LotteryEntity.ClosedState].createdAt shouldBe createdEvent.createdAt
-
-
-        val fetchLotteryWinnerResult = eventSourcedBehaviorTestKit.runCommand[LotteryEntity.FetchLotteryWinnerResult](
-          LotteryEntity.FetchLotteryWinner()
-        )
-
-        fetchLotteryWinnerResult.hasNoEvents shouldBe true
-        fetchLotteryWinnerResult.stateOfType[LotteryEntity.ClosedState].id shouldBe createdEvent.id
-        fetchLotteryWinnerResult.stateOfType[LotteryEntity.ClosedState].lotteryName shouldBe lotteryName
-        fetchLotteryWinnerResult.stateOfType[LotteryEntity.ClosedState].createdAt shouldBe createdEvent.createdAt
-        fetchLotteryWinnerResult.reply shouldBe a[LotteryEntity.SuccessfulFetchLotteryWinnerResult]
       }
     }
   }

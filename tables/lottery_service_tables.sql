@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS lotteries (
 
 CREATE TABLE IF NOT EXISTS lottery_participants (
     participant_id VARCHAR(64),
+    participant_first_name VARCHAR(64),
+    participant_last_name VARCHAR(64),
     lottery_id VARCHAR(64),
     PRIMARY KEY(participant_id)
 )

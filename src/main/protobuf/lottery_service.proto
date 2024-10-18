@@ -24,6 +24,8 @@ message AdminCreateLotteryResponse {
 
 message ParticipateInLotteryRequest {
   string lottery_id = 1;
+  string participant_first_name = 2;
+  string participant_last_name = 3;
 }
 
 message ParticipateInLotteryResponse {
@@ -43,8 +45,10 @@ message Lottery {
 message LotteryResult {
   string lottery_id = 1;
   string lottery_name = 2;
-  Date lottery_creation_date = 3;
-  optional string lottery_winner = 4;
+  string winner_first_name = 4;
+  string winner_last_name = 5;
+  Date lottery_creation_date = 6;
+  optional string lottery_winner = 7;
 }
 
 message FetchLotteriesResultsByDateRequest {

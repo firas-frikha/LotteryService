@@ -2,7 +2,7 @@ package query.service
 
 import akka.actor.typed.ActorSystem
 import akka.stream.alpakka.slick.scaladsl.SlickSession
-import query.model.{Lottery, LotteryState, LotteryWinner}
+import query.model.{Lottery, LotteryParticipant, LotteryState, LotteryWinner}
 import query.schema.LotterySchema
 
 import java.time.LocalDate
@@ -12,8 +12,9 @@ class DefaultQueryService(lotterySchema: LotterySchema, slickSession: SlickSessi
                          (implicit val actorSystem: ActorSystem[_]) extends QueryService {
 
   import actorSystem.executionContext
-  import slickSession.profile.api._
   import lotterySchema._
+  import slickSession.profile.api._
+
   override def fetchOpenLotteries(): Future[Seq[Lottery]] = {
     val query = lotterySchema.LotteryQuery
       .filter(_.state === LotteryState.Open)
@@ -26,9 +27,13 @@ class DefaultQueryService(lotterySchema: LotterySchema, slickSession: SlickSessi
     val query = lotterySchema.LotteryQuery
       .filter(_.state === LotteryState.Closed)
       .filter(_.createdAt === date)
+      .join(lotterySchema.lotteryParticipants)
+      .on(_.winner === _.participantId)
       .result
-      .map(buildLotteryWinners)
-    slickSession.db.run(query)
+      .map(lotteryWinners =>
+        lotteryWinners.map(lotteryWinner =>
+          buildLotteryWinner(lotteryWinner._1, lotteryWinner._2)))
+          slickSession.db.run(query)
   }
 
   override def fetchClosedLotteries(): Future[Seq[Lottery]] = {
@@ -39,14 +44,14 @@ class DefaultQueryService(lotterySchema: LotterySchema, slickSession: SlickSessi
     slickSession.db.run(query)
   }
 
-  private[this] def buildLotteryWinners(lotteries: Seq[Lottery]): Seq[LotteryWinner] =
-    lotteries.map(lottery =>
-      LotteryWinner(
-        lotteryId = lottery.id,
-        lottery_name = lottery.name,
-        creationDate = lottery.createdAt,
-        winnerId = lottery.winner
-      )
+  private[this] def buildLotteryWinner(lottery: Lottery, lotteryParticipant: LotteryParticipant): LotteryWinner =
+    LotteryWinner(
+      lotteryId = lotteryParticipant.lotteryId,
+      lotteryName = lottery.name,
+      participantFirstName = lotteryParticipant.participantFirstName,
+      participantLastName = lotteryParticipant.participantLastName,
+      creationDate = lottery.createdAt,
+      winnerId = lottery.winner
     )
 
 }
