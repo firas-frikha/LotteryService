@@ -32,7 +32,7 @@ object ProjectionManagement {
                   readJournalPluginId = JdbcReadJournal.Identifier,
                   tag = LotteryEntity.Tags(instance)
                 ),
-                () => new SlickJdbcSession(SlickSession.forConfig(context.system.settings.config.getConfig("slick.dbs.projection"))),
+                () => new SlickJdbcSession(SlickSession.forConfig(context.system.settings.config.getConfig("slick.dbs"))),
                 handler = () => new LotteryModelHandler()
               )
             )
