@@ -88,11 +88,19 @@ You can use grpcui to explore the available routes and interact with the service
 `
 This will open a web UI where you can view the available gRPC routes and test the service.
 
+### **Build**
+
+To build the project, run the following command:
+
+`sbt run
+`
+
 ### **Testing**
 
 The project includes unit tests for all project modules.
 
 ### Run unit tests:
+
 `sbt test
 `
 
