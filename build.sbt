@@ -12,6 +12,7 @@ resolvers += "Akka library repository".at("https://repo.akka.io/maven")
 
 enablePlugins(AkkaGrpcPlugin)
 
+run / fork := true
 
 coverageExcludedPackages := "lottery.service.*"
 
