@@ -1,4 +1,4 @@
-**# **Lottery System**
+# Lottery System
 
 This is a gRPC-based Lottery System built using the Akka framework, leveraging event sourcing, CQRS, and cluster
 sharding to manage stateful entities efficiently. The system allows the creation and participation in lotteries, with
@@ -6,8 +6,8 @@ automatic closing and winner selection.
 
 ## **Usage**
 
-This project exposes several gRPC routes for managing lotteries. The main entity is the Lottery with three states: *
-*Empty**, **Active**, and **Closed**.
+This project exposes several gRPC routes for managing lotteries. The main entity is the Lottery with three states:
+**Empty**, **Active**, and **Closed**.
 
 ### **Lottery States**
 
@@ -70,7 +70,7 @@ You can create these tables by executing the following commands:
 
 3. ### Create projection tables:
 
-`docker exec -i lottery-db psql -U lotteryservice -t < tables/projection_tables.sql**
+`docker exec -i lottery-db psql -U lotteryservice -t < tables/projection_tables.sql
 `
 
 ### Step 4: Run the Service:
@@ -90,7 +90,7 @@ This will open a web UI where you can view the available gRPC routes and test th
 
 ### **Testing**
 
-The project includes unit and integration tests for all project modules.
+The project includes unit tests for all project modules.
 
 ### Run unit tests:
 `sbt test
